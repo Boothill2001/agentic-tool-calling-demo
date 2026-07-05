@@ -53,6 +53,30 @@ LLM formats result --> Final Answer + Execution Trace
 | **Clarification** | Missing required parameters | "Check that customer for me" (no ID) |
 | **Human Approval** | Destructive actions (cancel, refund) | "Cancel order O006" |
 
+## Demo
+
+### SQL Route — Structured Database Query
+
+User asks *"How long has customer C001 been with us?"* → LLM routes to `sql_tool` → parameterized query → formatted answer with full execution trace.
+
+![SQL Route](assets/demo_sql_route.png)
+
+The execution trace shows every step: route decision, schema validation, permission check, and the actual tool result with structured data.
+
+![SQL Execution Trace](assets/demo_sql_trace.png)
+
+### RAG Route — Policy Document Search
+
+User asks *"What is the refund policy?"* → LLM routes to `rag_tool` → Qdrant retrieval → answer with citations from policy docs.
+
+![RAG Route](assets/demo_rag_route.png)
+
+Full trace showing validation, RAG search results with similarity scores, and source documents.
+
+![RAG Execution Trace](assets/demo_rag_trace.png)
+
+![RAG Sources](assets/demo_rag_sources.png)
+
 ## Quick Start
 
 ```bash
