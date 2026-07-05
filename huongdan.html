@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn Agentic Tool Calling Demo — Nguyễn Minh Trí</title>
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --ink: #1e2430;
+    --muted: #5b6472;
+    --line: #e4dfd5;
+    --accent: #d97706;
+    --accent-soft: #fef3c7;
+    --accent2: #0f6b5c;
+    --accent2-soft: #e2f0ec;
+    --code-bg: #1b2028;
+    --code-ink: #d8dee9;
+    --radius: 14px;
+    --shadow: 0 2px 12px rgba(30,36,48,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181f;
+      --surface: #1c222c;
+      --ink: #e8e6e1;
+      --muted: #9aa3b0;
+      --line: #2c3440;
+      --accent: #fbbf24;
+      --accent-soft: #422006;
+      --accent2: #4fbfa8;
+      --accent2-soft: #16332d;
+      --code-bg: #10141a;
+      --code-ink: #cfd6e0;
+      --shadow: 0 2px 12px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.7; font-size: 16.5px;
+  }
+  .hero {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 55%, #78350f 100%);
+    color: #fffbeb; padding: 64px 24px 56px; text-align: center;
+  }
+  .hero h1 { font-size: clamp(1.8rem, 4.5vw, 3rem); font-weight: 800; letter-spacing: -.02em; }
+  .hero h1 em { font-style: italic; font-family: Georgia, serif; color: #bef264; }
+  .hero p.sub { max-width: 720px; margin: 18px auto 0; font-size: 1.1rem; color: #fde68a; }
+  .badges { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .badge {
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    padding: 6px 16px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+  }
+  .hero a.repo {
+    display: inline-block; margin-top: 28px; background: #bef264; color: #78350f;
+    font-weight: 700; text-decoration: none; padding: 12px 28px; border-radius: 999px;
+    transition: transform .15s ease;
+  }
+  .hero a.repo:hover { transform: translateY(-2px); }
+  nav {
+    position: sticky; top: 0; z-index: 50; background: var(--surface);
+    border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+    overflow-x: auto; white-space: nowrap;
+  }
+  nav .inner { max-width: 980px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; }
+  nav a {
+    display: inline-block; padding: 13px 14px; color: var(--muted);
+    text-decoration: none; font-size: .88rem; font-weight: 600; border-bottom: 3px solid transparent;
+  }
+  nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 20px 80px; }
+  section { margin-top: 56px; scroll-margin-top: 70px; }
+  h2 {
+    font-size: 1.7rem; font-weight: 800; letter-spacing: -.01em;
+    display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+  }
+  h2 .num {
+    background: var(--accent); color: #fff; width: 40px; height: 40px; flex: none;
+    border-radius: 12px; display: grid; place-items: center; font-size: 1.05rem;
+  }
+  h3 { margin: 26px 0 10px; font-size: 1.15rem; }
+  p { margin: 10px 0; }
+  p.lead { font-size: 1.06rem; color: var(--muted); }
+  strong { color: var(--ink); }
+  a { color: var(--accent); }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); margin: 16px 0;
+  }
+  .callout {
+    border-left: 5px solid var(--accent); background: var(--accent-soft);
+    border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 18px 0;
+  }
+  .callout.warn { border-left-color: #ef4444; background: #fef2f2; }
+  @media (prefers-color-scheme: dark) { .callout.warn { background: #3b1111; } }
+  .callout.green { border-left-color: var(--accent2); background: var(--accent2-soft); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+  .feature {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .feature .icon { font-size: 1.7rem; }
+  .feature h4 { margin: 10px 0 6px; font-size: 1.03rem; }
+  .feature p { font-size: .93rem; color: var(--muted); margin: 0; }
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; font-size: .88rem; line-height: 1.6;
+    margin: 14px 0; font-family: Consolas, "Cascadia Code", monospace;
+  }
+  code.inline {
+    background: var(--accent-soft); color: var(--accent); padding: 2px 7px;
+    border-radius: 6px; font-size: .88em; font-family: Consolas, monospace;
+  }
+  pre .c { color: #7c8ba1; }
+  pre .k { color: #fde68a; }
+  .pipe { display: flex; flex-direction: column; gap: 0; margin: 22px 0; }
+  .pipe-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .pipe-box {
+    flex: 1; min-width: 180px; background: var(--surface); border: 2px solid var(--accent);
+    border-radius: 12px; padding: 14px 18px; text-align: center;
+  }
+  .pipe-box.alt { border-color: var(--accent2); }
+  .pipe-box.danger { border-color: #ef4444; }
+  .pipe-box b { display: block; font-size: .98rem; }
+  .pipe-box span { font-size: .84rem; color: var(--muted); }
+  .pipe-arrow { text-align: center; font-size: 1.5rem; color: var(--accent); padding: 4px 0; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-size: .95rem; }
+  th { background: var(--accent); color: #fff; text-align: left; padding: 12px 16px; font-size: .9rem; }
+  td { padding: 11px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%); }
+  td.hl { font-weight: 800; color: var(--accent); }
+  .tree { font-family: Consolas, monospace; font-size: .87rem; }
+  .tree .dir { color: var(--accent2); font-weight: 700; }
+  .tree .note { color: #7c8ba1; }
+  .tree .star { color: #e5b100; }
+  ol.steps { counter-reset: step; list-style: none; margin: 20px 0; }
+  ol.steps > li {
+    position: relative; padding: 4px 0 22px 58px; counter-increment: step;
+    border-left: 2px dashed var(--line); margin-left: 20px;
+  }
+  ol.steps > li:last-child { border-left-color: transparent; }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: -21px; top: 0;
+    width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
+    color: #fff; font-weight: 800; display: grid; place-items: center;
+  }
+  ol.steps b.t { font-size: 1.04rem; }
+  details {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    margin: 12px 0; box-shadow: var(--shadow); overflow: hidden;
+  }
+  summary {
+    cursor: pointer; padding: 16px 20px; font-weight: 700; list-style: none;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  summary::after { content: "+"; color: var(--accent); font-size: 1.2rem; flex: none; }
+  details[open] summary::after { content: "-"; }
+  details .body { padding: 0 20px 18px; color: var(--muted); }
+  details .body strong { color: var(--ink); }
+  footer {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    border-top: 1px solid var(--line); margin-top: 60px; font-size: .92rem;
+  }
+  @media (max-width: 640px) {
+    body { font-size: 15.5px; }
+    .hero { padding: 44px 18px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= HERO ================= -->
+<div class="hero">
+  <h1>Agentic Tool Calling — <em>Hướng dẫn A-Z</em></h1>
+  <p class="sub">AI Assistant biết khi nào KHÔNG dùng RAG — routing queries đến database, calculator, API
+  với structured JSON, schema validation, permission check, và human approval.</p>
+  <div class="badges">
+    <span class="badge">Python 3.10+</span>
+    <span class="badge">Streamlit</span>
+    <span class="badge">DeepSeek LLM</span>
+    <span class="badge">Pydantic v2</span>
+    <span class="badge">SQLite</span>
+    <span class="badge">5 Routes</span>
+  </div>
+  <a class="repo" href="https://github.com/Boothill2001/agentic-tool-calling-demo" target="_blank">Xem source trên GitHub</a>
+</div>
+
+<!-- ================= NAV ================= -->
+<nav><div class="inner">
+  <a href="#concept">1. Concept</a>
+  <a href="#routes">2. 5 Routes</a>
+  <a href="#files">3. Từng file</a>
+  <a href="#flow">4. Luồng chạy</a>
+  <a href="#setup">5. Cài đặt</a>
+  <a href="#demo">6. Chạy demo</a>
+  <a href="#docker">7. Docker</a>
+  <a href="#interview">8. Demo PV</a>
+  <a href="#qa">9. Q&amp;A</a>
+  <a href="#bugs">10. Lỗi hay gặp</a>
+</div></nav>
+
+<main>
+
+<!-- ================= 1 ================= -->
+<section id="concept">
+  <h2><span class="num">1</span> Tool Calling là gì? Tại sao không phải lúc nào cũng RAG?</h2>
+  <p class="lead">RAG tuyệt vời cho câu hỏi về <strong>tài liệu</strong> (policy, docs, knowledge base).
+  Nhưng khi user hỏi <em>"Customer C001 mua hàng bao lâu rồi?"</em> — đáp án nằm trong <strong>database</strong>, không phải document.</p>
+
+  <div class="card">
+    <p><strong>Tool Calling</strong> = LLM không trả lời trực tiếp, mà tạo ra một <strong>structured JSON</strong> mô tả:
+    <em>"Cần gọi tool gì, với tham số nào"</em> → backend validate → execute → trả kết quả về LLM để format.</p>
+    <p>Giống như LLM là <strong>brain</strong> (ra quyết định), còn tools là <strong>hands</strong> (thực hiện).</p>
+  </div>
+
+  <div class="callout warn">
+    <strong>Nguyên tắc cốt lõi:</strong> LLM <strong>KHÔNG BAO GIỜ</strong> trực tiếp query database.
+    LLM chỉ tạo structured tool call → backend validate schema + permission → rồi mới execute.
+    Đây là cách production system thật hoạt động.
+  </div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section id="routes">
+  <h2><span class="num">2</span> 5 Routes — LLM phân loại intent</h2>
+
+  <div class="grid">
+    <div class="feature">
+      <div class="icon">1️⃣</div>
+      <h4>SQL Database</h4>
+      <p>Hỏi về customer, order, revenue, ticket → LLM chọn đúng query function + args →
+      backend chạy <strong>parameterized SQL</strong> (không raw SQL từ LLM).</p>
+    </div>
+    <div class="feature">
+      <div class="icon">2️⃣</div>
+      <h4>Calculator</h4>
+      <p>Tính toán số học → <strong>AST-safe eval</strong> (không dùng eval()).
+      Có thể chain với SQL: "Revenue tháng này vs tháng trước, thay đổi bao nhiêu %?"</p>
+    </div>
+    <div class="feature">
+      <div class="icon">3️⃣</div>
+      <h4>RAG (Policy docs)</h4>
+      <p>Hỏi về chính sách (refund, shipping, warranty) → <strong>Qdrant in-memory</strong> retrieval
+      → LLM trả lời kèm citations [1][2].</p>
+    </div>
+    <div class="feature">
+      <div class="icon">4️⃣</div>
+      <h4>Clarification</h4>
+      <p>Thiếu tham số bắt buộc → LLM <strong>hỏi lại</strong> thay vì đoán.
+      Ví dụ: "Check that customer" → "Customer nào? Cho em ID hoặc tên."</p>
+    </div>
+  </div>
+
+  <div class="card" style="border-left: 4px solid #ef4444;">
+    <h4 style="margin-top:0">5️⃣ Human Approval (High-risk actions)</h4>
+    <p>Cancel order, process refund = <strong>destructive action</strong>.
+    LLM flag <code class="inline">risk_level: high</code> → UI hiện dialog xác nhận → chỉ execute khi user bấm Approve.
+    <strong>Không bao giờ tự động cancel/refund.</strong></p>
+  </div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section id="files">
+  <h2><span class="num">3</span> Từng file làm gì?</h2>
+  <div class="card tree">
+<pre style="background:transparent;color:inherit;padding:0;margin:0">
+agentic-tool-calling-demo/
+├── <span class="dir">data/</span>
+│   ├── seed.sql               <span class="note">← 4 tables: customers(20), orders(40), payments(35), tickets(15)</span>
+│   ├── enterprise.db          <span class="note">← SQLite DB (gitignored, build bằng seed_db.py)</span>
+│   └── <span class="dir">docs/</span>                 <span class="note">← 5 policy docs cho RAG route</span>
+│
+├── <span class="dir">src/</span>
+│   ├── schema.py              <span class="note">← Pydantic models: RouteDecision, ToolResult, ExecutionTrace</span>
+│   ├── router.py              <span class="star">⭐</span> <span class="note">← LLM Router: query → structured JSON decision</span>
+│   ├── validator.py           <span class="note">← Validate tool_name tồn tại, required args đủ</span>
+│   ├── permissions.py         <span class="note">← Check risk_level, flag human approval</span>
+│   ├── llm.py                 <span class="note">← DeepSeek wrapper (OpenAI-compatible)</span>
+│   ├── embeddings.py          <span class="note">← Shared embedding (all-MiniLM-L6-v2)</span>
+│   └── <span class="dir">tools/</span>
+│       ├── sql_tool.py        <span class="note">← 6 parameterized query functions</span>
+│       ├── calculator.py      <span class="note">← AST-safe calculator</span>
+│       ├── order_api.py       <span class="note">← Mock API: cancel_order, process_refund</span>
+│       └── rag_tool.py        <span class="note">← Qdrant in-memory RAG cho 5 policy docs</span>
+│
+├── app.py                     <span class="note">← Streamlit UI: chat + execution trace + human approval</span>
+├── seed_db.py                 <span class="note">← Tạo SQLite DB từ seed.sql</span>
+├── config.py                  <span class="note">← DB_PATH, LLM settings, HIGH_RISK_TOOLS</span>
+├── .env.example               <span class="note">← Mẫu API key (copy → .env rồi điền)</span>
+├── Dockerfile
+└── docker-compose.yml
+</pre>
+  </div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section id="flow">
+  <h2><span class="num">4</span> Luồng chạy — từ câu hỏi đến câu trả lời</h2>
+  <div class="pipe">
+    <div class="pipe-row">
+      <div class="pipe-box" style="border-style:dashed"><b>User Query</b><span>"How long has customer C001 been with us?"</span></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box"><b>LLM Router (DeepSeek)</b><span>Phân tích intent → output structured JSON</span></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box alt"><b>Schema Validation (Pydantic)</b><span>tool_name tồn tại? required args đủ?</span></div>
+    </div>
+    <div class="pipe-arrow">↓ PASS &nbsp;&nbsp;&nbsp; FAIL → Clarification</div>
+    <div class="pipe-row">
+      <div class="pipe-box alt"><b>Permission Check</b><span>risk_level? read=auto, write=human approval</span></div>
+    </div>
+    <div class="pipe-arrow">↓ APPROVED &nbsp;&nbsp;&nbsp; HIGH RISK → Confirmation Dialog</div>
+    <div class="pipe-row">
+      <div class="pipe-box"><b>Tool Execution</b><span>SQL (parameterized) | Calculator (AST) | RAG (Qdrant) | Order API</span></div>
+    </div>
+    <div class="pipe-arrow">↓</div>
+    <div class="pipe-row">
+      <div class="pipe-box" style="border-style:dashed"><b>LLM formats result → Final Answer</b><span>+ full Execution Trace (JSON) hiển thị trên UI</span></div>
+    </div>
+  </div>
+
+  <div class="callout green">
+    <strong>Execution Trace</strong> ghi lại MỌI bước: route decision, validation result, permission check,
+    tool result, và final answer — hiển thị dạng expandable JSON trên giao diện. Giống audit log trong production.
+  </div>
+</section>
+
+<!-- ================= 5 ================= -->
+<section id="setup">
+  <h2><span class="num">5</span> Cài đặt từng bước (Windows)</h2>
+  <div class="callout warn">Yêu cầu: <strong>Python 3.10+</strong> và <strong>DeepSeek API key</strong>
+  (lấy tại platform.deepseek.com — nạp $2 là dùng thoải mái).</div>
+
+  <ol class="steps">
+    <li>
+      <b class="t">Clone repo</b>
+      <pre><span class="k">git clone https://github.com/Boothill2001/agentic-tool-calling-demo.git</span>
+<span class="k">cd agentic-tool-calling-demo</span></pre>
+    </li>
+    <li>
+      <b class="t">Tạo môi trường ảo</b>
+      <pre><span class="k">python -m venv .venv</span>
+<span class="k">.venv\Scripts\activate</span></pre>
+    </li>
+    <li>
+      <b class="t">Cài thư viện</b>
+      <pre><span class="k">pip install -r requirements.txt</span></pre>
+    </li>
+    <li>
+      <b class="t">Cấu hình API key</b>
+      <pre><span class="k">copy .env.example .env</span>
+<span class="c"># Mở .env bằng Notepad, thay your-api-key-here bằng DeepSeek key thật</span></pre>
+    </li>
+    <li>
+      <b class="t">Seed database</b> — tạo SQLite DB với dữ liệu mẫu (~110 rows).
+      <pre><span class="k">python seed_db.py</span>
+<span class="c"># Thấy "Database seeded: data/enterprise.db" là OK</span></pre>
+    </li>
+    <li>
+      <b class="t">Chạy</b>
+      <pre><span class="k">streamlit run app.py</span>
+<span class="c"># Trình duyệt tự mở http://localhost:8501</span></pre>
+    </li>
+  </ol>
+</section>
+
+<!-- ================= 6 ================= -->
+<section id="demo">
+  <h2><span class="num">6</span> Chạy demo — thử 5 routes</h2>
+
+  <div class="card">
+    <h3 style="margin-top:0">SQL Route</h3>
+    <p>Gõ: <code class="inline">How long has customer C001 been with us?</code></p>
+    <p>→ LLM route tới <code class="inline">sql_tool</code> → gọi <code class="inline">get_customer_purchase_duration</code>
+    → trả lời "3 years, 3 months, 1208 days" kèm execution trace JSON.</p>
+
+    <h3>RAG Route</h3>
+    <p>Gõ: <code class="inline">What is the refund policy?</code></p>
+    <p>→ LLM route tới <code class="inline">rag_tool</code> → Qdrant retrieval → trả lời kèm citations [1][2]
+    và similarity scores.</p>
+
+    <h3>Calculator Route</h3>
+    <p>Gõ: <code class="inline">What is 15% of 2500000?</code></p>
+    <p>→ Route tới calculator → AST-safe eval → 375,000.</p>
+
+    <h3>Clarification Route</h3>
+    <p>Gõ: <code class="inline">Check that customer for me</code></p>
+    <p>→ LLM phát hiện thiếu customer_id → hỏi lại: "Which customer? Please provide ID or name."</p>
+
+    <h3>Human Approval Route</h3>
+    <p>Gõ: <code class="inline">Cancel order O006</code></p>
+    <p>→ LLM flag risk=high → UI hiện dialog xác nhận với chi tiết order → bấm Approve mới execute.</p>
+  </div>
+
+  <div class="callout">
+    Sidebar trái hiển thị <strong>Available Tools</strong> (4 loại) và <strong>DB Explorer</strong>
+    (row counts của 4 tables + sample data). Mỗi response đều có <strong>Execution Trace (JSON)</strong> expandable.
+  </div>
+</section>
+
+<!-- ================= 7 ================= -->
+<section id="docker">
+  <h2><span class="num">7</span> Chạy bằng Docker</h2>
+  <div class="card">
+    <p>Tạo file <code class="inline">.env</code> trước (chứa API key), rồi:</p>
+    <pre><span class="k">docker compose up --build</span>
+<span class="c"># Mở http://localhost:8501</span></pre>
+    <p>Docker sẽ tự seed database lúc build. File <code class="inline">.env</code> được mount qua <code class="inline">env_file</code> trong docker-compose.</p>
+  </div>
+  <div class="callout warn">
+    <strong>QUAN TRỌNG:</strong> File <code class="inline">.env</code> chứa API key thật — KHÔNG commit lên git.
+    Chỉ commit <code class="inline">.env.example</code> (chứa placeholder).
+  </div>
+</section>
+
+<!-- ================= 8 ================= -->
+<section id="interview">
+  <h2><span class="num">8</span> Kịch bản demo phỏng vấn (5 phút)</h2>
+  <ol class="steps">
+    <li><b class="t">Mở app, hỏi SQL: "How long has C001 been with us?"</b>
+      → chỉ vào execution trace:
+      <em>"LLM không query DB trực tiếp. Nó output structured JSON — route, tool_name, args — backend validate
+      rồi mới chạy parameterized SQL."</em></li>
+    <li><b class="t">Hỏi RAG: "What is the refund policy?"</b>
+      → chỉ vào route thay đổi sang <code class="inline">rag_tool</code>:
+      <em>"Router tự biết câu nào cần database, câu nào cần document. Không phải lúc nào cũng RAG."</em></li>
+    <li><b class="t">Hỏi thiếu param: "Check that customer"</b>
+      → assistant hỏi lại:
+      <em>"Thiếu required field → LLM hỏi lại thay vì đoán bừa. Giống như function call validation."</em></li>
+    <li><b class="t">Hỏi high-risk: "Cancel order O006"</b>
+      → chỉ vào confirmation dialog:
+      <em>"Destructive action cần human approval. LLM flag risk=high, UI block execution cho tới khi user confirm.
+      Production system thật cũng hoạt động y vậy."</em></li>
+    <li><b class="t">Chỉ vào sidebar DB Explorer + execution trace:</b>
+      <em>"Toàn bộ pipeline transparent — từ intent classification đến tool execution đều có audit trail.
+      Đây là điều khác biệt giữa demo toy và production-ready architecture."</em></li>
+  </ol>
+</section>
+
+<!-- ================= 9 ================= -->
+<section id="qa">
+  <h2><span class="num">9</span> Câu hỏi phỏng vấn thường gặp</h2>
+
+  <details>
+    <summary>Tại sao LLM không trực tiếp viết SQL?</summary>
+    <div class="body"><p><strong>Bảo mật</strong>: LLM có thể bị prompt injection → sinh SQL nguy hiểm (DROP TABLE, data leak).
+    Thay vào đó, LLM chỉ chọn <strong>tool_name + args</strong> từ registry đã define sẵn, backend build parameterized query.
+    Giống như principle of least privilege — LLM chỉ có quyền gọi function, không có quyền viết code.</p></div>
+  </details>
+
+  <details>
+    <summary>Structured tool calling khác function calling của OpenAI thế nào?</summary>
+    <div class="body"><p>Concept giống nhau: LLM output structured JSON thay vì free text.
+    OpenAI function calling là <strong>API-level feature</strong> (model đã fine-tune cho JSON output).
+    Project này implement <strong>application-level</strong>: custom prompt + Pydantic validation + permission layer —
+    chạy được với bất kỳ LLM nào (DeepSeek, Claude, GPT), không phụ thuộc provider-specific feature.</p></div>
+  </details>
+
+  <details>
+    <summary>Human approval trong production thật implement thế nào?</summary>
+    <div class="body"><p>Demo dùng Streamlit dialog. Production thật: <strong>async workflow</strong> —
+    tool call tạo approval request trong queue (Slack notification, email, dashboard) →
+    authorized person approve/reject → system resume execution. Thêm timeout, escalation, audit log.
+    Pattern giống Temporal/Step Functions.</p></div>
+  </details>
+
+  <details>
+    <summary>Execution trace dùng để làm gì?</summary>
+    <div class="body"><p>3 mục đích: (1) <strong>Debug</strong> — khi kết quả sai, trace cho biết sai ở bước nào
+    (router classify sai? validator reject? tool error?). (2) <strong>Audit</strong> — compliance cần biết
+    AI quyết định gì, dựa trên logic nào. (3) <strong>Improve</strong> — phân tích pattern từ traces
+    để fine-tune router prompt hoặc thêm tools.</p></div>
+  </details>
+
+  <details>
+    <summary>Sao không dùng LangChain Agent?</summary>
+    <div class="body"><p>LangChain Agent là <strong>autonomous loop</strong> — LLM tự quyết tool nào, chạy,
+    đọc kết quả, lại chọn tool tiếp. Khó kiểm soát, khó debug, unpredictable cost.
+    Project này dùng <strong>single-turn structured output</strong>: LLM quyết 1 lần, backend validate rồi execute.
+    Deterministic hơn, auditabe, production-safe hơn.</p></div>
+  </details>
+
+  <details>
+    <summary>Scale lên production cần thêm gì?</summary>
+    <div class="body"><p>Thay SQLite bằng PostgreSQL; thêm connection pool; async tool execution;
+    rate limiting per user; caching (same query → same route → cache result);
+    monitoring (latency per route, error rate, LLM cost tracking);
+    A/B test router prompts; fallback khi LLM timeout.</p></div>
+  </details>
+</section>
+
+<!-- ================= 10 ================= -->
+<section id="bugs">
+  <h2><span class="num">10</span> Lỗi thường gặp &amp; cách sửa</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Lỗi</th><th>Nguyên nhân &amp; cách sửa</th></tr>
+    <tr><td><code class="inline">ModuleNotFoundError: langchain_openai</code></td>
+      <td><code class="inline">pip install langchain-openai</code> — có thể cài nhầm Python version</td></tr>
+    <tr><td><code class="inline">ModuleNotFoundError: qdrant_client</code></td>
+      <td><code class="inline">pip install qdrant-client</code> — check đúng Python env đang active</td></tr>
+    <tr><td>LLM trả JSON sai format</td>
+      <td>DeepSeek thỉnh thoảng thêm markdown fence. Code đã handle: strip ```json...``` wrapper trước parse</td></tr>
+    <tr><td><code class="inline">Database not found</code></td>
+      <td>Chưa seed → chạy <code class="inline">python seed_db.py</code></td></tr>
+    <tr><td>Streamlit màn hình đen port 8501</td>
+      <td>Port bị chiếm → <code class="inline">streamlit run app.py --server.port 8502</code></td></tr>
+    <tr><td><code class="inline">NotImplementedError: meta tensor</code></td>
+      <td>Python 3.13 + torch mới bị lỗi → dùng Python 3.11 hoặc Docker</td></tr>
+  </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p><strong>Nguyễn Minh Trí</strong> — Senior AI Engineer (GenAI / LLM Applications)</p>
+  <p>minhtri.cm2001@gmail.com · <a href="https://github.com/Boothill2001/agentic-tool-calling-demo">github.com/Boothill2001/agentic-tool-calling-demo</a></p>
+</footer>
+
+</body>
+</html>
